@@ -5,7 +5,7 @@
     <RootNamespace>LostTech.TensorFlow.GPT</RootNamespace>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <Nullable>enable</Nullable>
 
     <!-- Package stuff -->

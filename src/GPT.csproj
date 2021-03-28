@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>LostTech.TensorFlow.GPT</AssemblyName>
+    <RootNamespace>LostTech.TensorFlow.GPT</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <Nullable>enable</Nullable>
+
+    <!-- Package stuff -->
+    <Description>GPT-2 neural network (https://openai.com/blog/better-language-models/).
+
+GPT-2 translates text, answers questions, summarizes passages, and generates text output on a level is sometimes indistinguishable from that of humans.
+
+A .NET port of open-source artificial intelligence created by OpenAI.</Description>
+    <PackageProjectUrl>https://github.com/losttech/GPT</PackageProjectUrl>
+    <PackageTags>TensorFlow;OpenAI;AI;deep-learning;ML;NLP;transformer;GPT;GPT-2;GPT2</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Authors>Victor Milovanov</Authors>
+    <Company>Lost Tech LLC</Company>
+    <Product>LostTech.TensorFlow</Product>
+    <!--<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>-->
+
+    <!-- The following is recommended for public projects -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <DebugSymbols>true</DebugSymbols>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <RepositoryUrl>https://github.com/losttech/GPT.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IndexRange" Version="1.0.0" />
+    <PackageReference Include="LostTech.TensorFlow" Version="[1.15.0, 1.16)" />
+    <!-- The following is recommended for public projects -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="morelinq" Version="3.3.2" />
+    <PackageReference Include="System.Collections" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

@@ -9,5 +9,5 @@ foreach ($filename in @("checkpoint","encoder.json","hparams.json",
 {
 	$fetch = "$name/$filename"
 	echo "fetching $fetch"
-	Invoke-WebRequest -OutFile "models/$fetch" -Uri "https://storage.googleapis.com/gpt-2/models/$fetch"
+	Invoke-WebRequest -OutFile "models/$fetch" -Uri "https://openaipublic.blob.core.windows.net/gpt-2/models/$fetch"
 }

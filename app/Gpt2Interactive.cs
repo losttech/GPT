@@ -1,7 +1,6 @@
 ﻿namespace LostTech.TensorFlow.GPT {
     using System;
     using System.Collections.Generic;
-    using System.IO;
     using System.Linq;
     using System.Threading;
 
@@ -12,8 +11,9 @@
     using numpy;
 
     using tensorflow;
+    using tensorflow.compat.v1;
+    using tensorflow.compat.v1.train;
     using tensorflow.errors;
-    using tensorflow.train;
 
     class Gpt2Interactive : ConsoleCommand {
         /// <summary>
@@ -35,26 +35,31 @@
         ///     while 40 means 40 words are considered at each step. 0 (default) is a
         ///     special setting meaning no restrictions. 40 generally is a good value.
         /// </param>
-        public static void Run(string modelName = "117M", string? checkpoint = null, int? seed = null,
+        public static int Run(string modelName = "117M", string? checkpoint = null, int? seed = null,
             int sampleCount = 1,
             int batchSize = 1, int? length = null, float temperature = 1, int topK = 0) {
             if (sampleCount % batchSize != 0)
                 throw new ArgumentException();
 
-            var encoder = Gpt2Encoder.LoadEncoder(modelName);
-            var hParams = Gpt2Model.LoadHParams(modelName);
+            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(modelName);
 
-            int nCtx = hParams.n_ctx();
+            var encoder = Gpt2Encoder.LoadEncoder(modelPath);
+            var hParams = Gpt2Model.LoadHParams(modelPath);
+
+            int nCtx = hParams.ContextTokens;
             if (length is null)
                 length = nCtx;
             else if (length > nCtx)
                 throw new ArgumentException("Can't get samples longer than window size: " + nCtx);
 
+            foreach(var gpu in tf.config.list_physical_devices("gpu"))
+                tf.config.experimental.set_memory_growth(gpu, true);
+
             var sess = new Session(graph: new Graph());
             using var sessionContext = sess.StartUsing();
 
-            Tensor context = tf.placeholder(tf.int32, new TensorShape(batchSize, null));
-            tf.set_random_seed(seed);
+            Tensor context = v1.placeholder(tf.int32, new TensorShape(batchSize, null));
+            tf.random.set_seed(seed);
 
             Tensor output = Gpt2Sampler.SampleSequence(
                 hParams: hParams,
@@ -65,7 +70,7 @@
                 topK: topK);
 
             var saver = new Saver();
-            checkpoint ??= tf.train.latest_checkpoint(Path.Combine("models", modelName));
+            checkpoint ??= tf.train.latest_checkpoint(modelPath);
             saver.restore(sess, checkpoint);
 
             bool interrupted = false;
@@ -117,11 +122,13 @@
                 Console.Write(Delimiter);
                 Console.WriteLine(Delimiter);
             }
+
+            return 0;
         }
 
         public Gpt2Interactive() {
             this.IsCommand("run");
-            this.HasOption("m|model=", "Which model to use", name => this.ModelName = name);
+            this.HasOption("m|model=", "Which model to use (directory path)", name => this.ModelName = name);
             this.HasOption("s|seed=",
                 "Explicitly set seed for random generators to get reproducible results",
                 (int s) => this.Seed = s);
@@ -152,13 +159,14 @@
         public string Checkpoint { get; set; } = "latest";
 
         public override int Run(string[] remainingArguments) {
+            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(this.ModelName);
             string checkpoint = Gpt2Checkpoints.ProcessCheckpointConfig(
-                gpt2Root: Environment.CurrentDirectory,
+                modelPath: modelPath,
                 checkpoint: this.Checkpoint,
-                modelName: this.ModelName,
                 runName: this.RunName);
 
-            Run(modelName: this.ModelName,
+            return Run(
+                modelName: this.ModelName,
                 checkpoint: checkpoint,
                 seed: this.Seed,
                 sampleCount: this.SampleCount,
@@ -166,8 +174,6 @@
                 length: this.Length,
                 temperature: this.Temperature,
                 topK: this.TopK);
-
-            return 0;
         }
 
         const string Delimiter = "========================================";

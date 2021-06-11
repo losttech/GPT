@@ -37,7 +37,7 @@ A .NET port of open-source artificial intelligence created by OpenAI.</Descripti
 
   <ItemGroup>
     <PackageReference Include="IndexRange" Version="1.0.0" />
-    <PackageReference Include="LostTech.TensorFlow" Version="[1.15.0, 1.16)" />
+    <PackageReference Include="LostTech.TensorFlow" Version="[2.5.0-preview1, 2.6.0)" />
     <!-- The following is recommended for public projects -->
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
     <PackageReference Include="morelinq" Version="3.3.2" />

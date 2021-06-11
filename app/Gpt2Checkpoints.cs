@@ -8,21 +8,21 @@
         public const string Fresh = "fresh";
         public const string Latest = "latest";
 
-        public static string GetLatestCheckpoint(string gpt2Root, string modelName, string? run) {
+        public static string GetLatestCheckpoint(string modelPath, string? run) {
             string? latestCheckpoint = run is null
                 ? null
-                : tf.train.latest_checkpoint(Path.GetFullPath(Path.Combine(gpt2Root, CheckpointDir, run)));
-            latestCheckpoint ??= GetOriginalCheckpoint(gpt2Root, modelName);
+                : tf.train.latest_checkpoint(Path.GetFullPath(Path.Combine(modelPath, CheckpointDir, run)));
+            latestCheckpoint ??= GetOriginalCheckpoint(modelPath);
             return latestCheckpoint;
         }
 
-        public static string GetOriginalCheckpoint(string gpt2Root, string modelName)
-            => tf.train.latest_checkpoint(Path.GetFullPath(Path.Combine(gpt2Root, "models", modelName)));
+        public static string GetOriginalCheckpoint(string modelPath)
+            => tf.train.latest_checkpoint(Path.GetFullPath(modelPath));
 
-        public static string ProcessCheckpointConfig(string gpt2Root, string checkpoint, string modelName, string? runName)
+        public static string ProcessCheckpointConfig(string checkpoint, string modelPath, string? runName)
             => checkpoint switch {
-                Latest => GetLatestCheckpoint(gpt2Root, modelName, runName),
-                Fresh => GetOriginalCheckpoint(gpt2Root, modelName),
+                Latest => GetLatestCheckpoint(modelPath, runName),
+                Fresh => GetOriginalCheckpoint(modelPath),
                 _ => checkpoint,
             };
     }

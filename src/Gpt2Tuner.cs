@@ -10,11 +10,12 @@ namespace LostTech.TensorFlow.GPT {
     using MoreLinq;
 
     using tensorflow;
-    using tensorflow.contrib.training;
-    using tensorflow.train;
+    using tensorflow.compat.v1;
+    using tensorflow.compat.v1.train;
+    using Variable = tensorflow.Variable;
 
     public class Gpt2Tuner {
-        public IHParams Hyperparams { get; }
+        public GptHParams Hyperparams { get; }
         readonly ISession session;
         public Tensor InputPlaceholder { get; }
         readonly Dictionary<string, Tensor> outputs;
@@ -25,7 +26,7 @@ namespace LostTech.TensorFlow.GPT {
         public int BatchSize { get; }
         public IReadOnlyList<Variable> ModelVariables { get; }
 
-        public Gpt2Tuner(IHParams hyperparams, ISession session,
+        public Gpt2Tuner(GptHParams hyperparams, ISession session,
                          Tensor inputPlaceholder, Dictionary<string, Tensor> outputs,
                          IGptTrainingSampleGenerator sampler,
                          int batchSize,
@@ -39,7 +40,7 @@ namespace LostTech.TensorFlow.GPT {
 
             this.Optimizer = optimizer ?? new AdamOptimizer(learning_rate: 0.0002);
 
-            this.ModelVariables = Enumerable.Where((PythonList<Variable>)tf.trainable_variables(), var => var.name.Contains("model")).ToArray();
+            this.ModelVariables = Enumerable.Where((PythonList<Variable>)v1.trainable_variables(), var => var.name.Contains("model")).ToArray();
 
             Tensor labels = inputPlaceholder[.., 1..];
             Tensor logits = outputs["logits"][.., ..^1];
@@ -54,7 +55,7 @@ namespace LostTech.TensorFlow.GPT {
         /// <returns>Loss</returns>
         public float FineTuneOnBatch() {
             var batch = MoreEnumerable
-                .GenerateByIndex(_ => this.Sampler.Sample(this.Hyperparams.n_ctx()))
+                .GenerateByIndex(_ => this.Sampler.Sample(this.Hyperparams.ContextTokens))
                 .Take(this.BatchSize)
                 .ToArray();
 

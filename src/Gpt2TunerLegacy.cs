@@ -13,9 +13,8 @@ namespace LostTech.TensorFlow.GPT {
     using numpy;
 
     using tensorflow;
-    using tensorflow.contrib.training;
-    using tensorflow.train;
-
+    using tensorflow.compat.v1;
+    using tensorflow.compat.v1.train;
     using static System.FormattableString;
 
     using DataSet = System.Collections.Generic.List<numpy.ndarray>;
@@ -26,12 +25,12 @@ namespace LostTech.TensorFlow.GPT {
 
         readonly DataSet dataset;
         readonly Gpt2Encoder encoder;
-        readonly IHParams hParams;
+        readonly GptHParams hParams;
         readonly int batchSize;
         readonly int sampleLength;
         readonly Random random;
 
-        public Gpt2TunerLegacy(DataSet dataset, Gpt2Encoder encoder, IHParams hParams,
+        public Gpt2TunerLegacy(DataSet dataset, Gpt2Encoder encoder, GptHParams hParams,
             int batchSize, int sampleLength, Random random) {
             this.dataset = dataset ?? throw new ArgumentNullException(nameof(dataset));
             this.encoder = encoder ?? throw new ArgumentNullException(nameof(encoder));
@@ -53,7 +52,7 @@ namespace LostTech.TensorFlow.GPT {
                 : new Session();
             using var _ = session.StartUsing();
 
-            Tensor context = tf.placeholder(tf.int32, new TensorShape(this.batchSize, null));
+            Tensor context = v1.placeholder(tf.int32, new TensorShape(this.batchSize, null));
             var output = Gpt2Model.Model(this.hParams, input: context);
 
             var sampler = new GptTrainingSampler(this.dataset, this.random);
@@ -73,7 +72,7 @@ namespace LostTech.TensorFlow.GPT {
                 max_to_keep: 5,
                 keep_checkpoint_every_n_hours: 1);
 
-            session.run(tf.global_variables_initializer());
+            session.run(v1.global_variables_initializer());
 
             Console.WriteLine("Loading checkpoint " + checkpoint);
             saver.restore(session, checkpoint);

@@ -17,13 +17,14 @@
             if (remainingArguments.Length < 1)
                 throw new ArgumentNullException("dataset");
 
+            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(this.ModelName);
+
             string checkpoint = Gpt2Checkpoints.ProcessCheckpointConfig(
-                gpt2Root: Environment.CurrentDirectory,
+                modelPath: modelPath,
                 checkpoint: this.Checkpoint,
-                modelName: this.ModelName,
                 runName: this.RunName);
 
-            var encoder = Gpt2Encoder.LoadEncoder(this.ModelName);
+            var encoder = Gpt2Encoder.LoadEncoder(modelPath);
 
             string searchPattern = this.Include ?? "*";
             string datasetName = remainingArguments[0];
@@ -35,10 +36,10 @@
                 return -1;
             }
 
-            var hParams = Gpt2Model.LoadHParams(this.ModelName);
+            var hParams = Gpt2Model.LoadHParams(modelPath);
 
             var random = this.Seed is null ? new Random() : new Random(this.Seed.Value);
-            if (this.Seed is not null) tf.set_random_seed(this.Seed);
+            tf.random.set_seed(this.Seed);
 
             var stop = new CancellationTokenSource();
             Console.CancelKeyPress += delegate { stop.Cancel(); };
@@ -50,8 +51,9 @@
                 SampleNum = this.SampleNum,
                 SampleEvery = this.SampleEvery,
             };
+            string checkpointOutputDirectory = Path.Combine(modelPath, Gpt2Checkpoints.CheckpointDir);
             trainer.FineTune(
-                checkpointsDir: Gpt2Checkpoints.CheckpointDir, checkpoint: checkpoint,
+                checkpointsDir: checkpointOutputDirectory, checkpoint: checkpoint,
                 run: this.RunName,
                 counter: checkpoint == "fresh" ? 1 : (int?)null,
                 sessionConfig: config,
@@ -89,6 +91,7 @@
         public int SaveEvery { get; set; } = 1000;
         public string RunName { get; set; } = DateTime.Now.ToString("s").Replace(':', '-');
         public string Checkpoint { get; set; } = "latest";
+        public string? OutputDirectory { get; set; }
         public string? Include { get; set; }
         public string? ColumnName { get; set; }
 
@@ -115,6 +118,8 @@
                 run => this.RunName = run);
             this.HasOption("c|checkpoint=", "Use specific checkpoint to start. Available values: 'latest' (default), 'fresh', or path to a checkpoint file",
                 checkpoint => this.Checkpoint = checkpoint);
+            this.HasOption("o|out-dir=", $"Place checkpoints into the specified directory (default: ./{Gpt2Checkpoints.CheckpointDir})",
+                path => this.OutputDirectory = path);
             this.HasOption("column=", "Read texts from specific CSV column",
                 name => this.ColumnName = name);
         }

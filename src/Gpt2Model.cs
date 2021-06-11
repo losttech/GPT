@@ -11,17 +11,20 @@
     using LostTech.Gradient.BuiltIns;
 
     using tensorflow;
-    using tensorflow.contrib.training;
+    using tensorflow.compat.v1;
     using tensorflow.python.ops.variable_scope;
+    using constant_initializer = tensorflow.constant_initializer;
+    using random_normal_initializer = tensorflow.random_normal_initializer;
+    using Variable = tensorflow.Variable;
 
     public static class Gpt2Model {
-        public static HParams DefaultHParams => new(kwargs: new PythonDict<string, object> {
+        public static Dictionary<string, int> DefaultHParams => new (){
             ["n_vocab"] = 0,
             ["n_ctx"] = 1024,
             ["n_embd"] = 768,
             ["n_head"] = 12,
             ["n_layer"] = 12,
-        });
+        };
 
         /// <summary>
         /// Deal with dynamic shape in tensorflow cleanly.
@@ -49,12 +52,12 @@
         /// </summary>
         static Tensor Norm(Tensor input, object scope, int axis = -1, double epsilon = 1e-5) {
             using var _ = new variable_scope(scope).StartUsing();
-            Dimension nState = input.shape[-1];
-            Variable g = tf.get_variable("g", new TensorShape(nState), initializer: new constant_initializer(1));
-            Variable b = tf.get_variable("b", new TensorShape(nState), initializer: new constant_initializer(0));
+            int nState = input.shape[-1];
+            Variable g = v1.get_variable("g", new TensorShape(nState), initializer: new constant_initializer(1));
+            Variable b = v1.get_variable("b", new TensorShape(nState), initializer: new constant_initializer(0));
             Tensor mean = tf.reduce_mean(input, axis: axis, keepdims: true);
             Tensor s = tf.reduce_mean(tf.square(input - mean), axis: axis, keepdims: true);
-            Tensor result = (input - mean) * tf.rsqrt(s + epsilon);
+            Tensor result = (input - mean) * tf.math.rsqrt(s + epsilon);
             result = result * g + b;
             return result;
         }
@@ -86,8 +89,8 @@
             var start = shape.Take(shape.Count - 1);
             object nx = shape.Last();
             var wShape = new TensorShape(ValueTuple.Create(1, nx, nf));
-            var w = tf.get_variable("w", wShape, initializer: new random_normal_initializer(stddev: wInitialStDev));
-            var b = tf.get_variable("b", new TensorShape(nf), initializer: new constant_initializer(0));
+            var w = v1.get_variable("w", wShape, initializer: new random_normal_initializer(stddev: wInitialStDev));
+            var b = v1.get_variable("b", new TensorShape(nf), initializer: new constant_initializer(0));
             Tensor result = tf.reshape_dyn(
                 tf.matmul(
                     tf.reshape_dyn(input, new[] { -1, nx }),
@@ -107,16 +110,16 @@
             return tf.cast(m, dtype);
         }
 
-        static ValueTuple<Tensor, Tensor> Attention(Tensor input, object scope, int nState, IHParams hParams, Tensor? past = null) {
+        static (Tensor attention, Tensor present) Attention(Tensor input, object scope, int nState, GptHParams hParams, Tensor? past = null) {
             if (input.shape.ndims != 3)
                 throw new ArgumentException();
-            Trace.Assert(nState % hParams.n_head() == 0);
+            Trace.Assert(nState % hParams.AttentionHeads == 0);
             if (!(past is null) && past.shape.ndims != 5)
                 throw new ArgumentException();
 
             Tensor SplitHeads(Tensor x) =>
                 // From [batch, sequence, features] to [batch, heads, sequence, features]
-                tf.transpose(SplitStates(x, hParams.n_head()), new[] { 0, 2, 1, 3 });
+                tf.transpose(SplitStates(x, hParams.AttentionHeads), new[] { 0, 2, 1, 3 });
 
             Tensor MergeHeads(Tensor x) =>
                 // Reverse of split_heads
@@ -136,7 +139,7 @@
             Tensor MultiHeadAttention(Tensor q, Tensor k, Tensor v) {
                 // q, k, v have shape [batch, heads, sequence, features]
                 Tensor w = tf.matmul(q, k, transpose_b: true);
-                w *= tf.rsqrt(tf.cast(v.shape[-1].value, w.dtype));
+                w *= tf.math.rsqrt(tf.cast(v.shape[-1], w.dtype));
 
                 w = MaskAttentionWeights(w);
                 w = Softmax(w);
@@ -147,7 +150,7 @@
             Tensor present;
             using (new variable_scope(scope).StartUsing()) {
                 var c = Conv1D(input, "c_attn", nState * 3);
-                var qkv = ((IEnumerable)tf.split(c, 3, axis: 2)).Cast<Tensor>().Select(SplitHeads).ToArray();
+                var qkv = ((IEnumerable)tf.split_dyn(c, 3, axis: 2)).Cast<Tensor>().Select(SplitHeads).ToArray();
                 var q = qkv[0];
                 var k = qkv[1];
                 var v = qkv[2];
@@ -169,33 +172,31 @@
 
         static Tensor MLP(Tensor input, string scope, int nState) {
             using var _ = new variable_scope(scope).StartUsing();
-            int nx = input.shape[-1].value;
+            int nx = input.shape[-1];
             var h = GeLU(Conv1D(input, "c_fc", nState));
             return Conv1D(h, "c_proj", nx);
         }
 
-        static ValueTuple<Tensor, Tensor> Block(Tensor input, string scope, IHParams hParams, Tensor? past = null) {
+        static ValueTuple<Tensor, Tensor> Block(Tensor input, string scope, GptHParams hParams, Tensor? past = null) {
             using var _ = new variable_scope(scope).StartUsing();
-            int nx = input.shape[-1].value;
-            var attentionPresent = Attention(Norm(input, "ln_1"), "attn", nx, hParams: hParams, past: past);
-            Tensor attention = attentionPresent.Item1;
-            Tensor present = attentionPresent.Item2;
-            input += (dynamic)attention;
+            int nx = input.shape[-1];
+            var (attention, present) = Attention(Norm(input, "ln_1"), "attn", nx, hParams: hParams, past: past);
+            input += attention;
             var m = MLP(Norm(input, "ln_2"), "mlp", nx * 4);
             input += m;
             Tensor result = input;
             return ValueTuple.Create(result, present);
         }
 
-        public static int?[] PastShape(IHParams hParams, int? batchSize = null, int? sequence = null) {
+        public static int?[] PastShape(GptHParams hParams, int? batchSize = null, int? sequence = null) {
             return new int?[]
             {
                 batchSize,
-                hParams.n_layer(),
+                hParams.EncoderLayers,
                 2,
-                hParams.n_head(),
+                hParams.AttentionHeads,
                 sequence,
-                hParams.n_embd() / hParams.n_head(),
+                hParams.EmbeddingDim / hParams.AttentionHeads,
             };
         }
 
@@ -203,7 +204,7 @@
         /// "Add a new axis of given size.
         /// </summary>
         static Tensor ExpandTile(object value, Tensor size) {
-            Tensor tensor = tf.convert_to_tensor(value, dtype: (DType?)null, name: "value");
+            Tensor tensor = tf.convert_to_tensor(value, name: "value");
             int ndims = tensor.shape.rank!.Value;
             return tf.tile_dyn(
                 tf.expand_dims(tensor, axis: 0),
@@ -215,20 +216,20 @@
             Tensor nSteps = tf.shape(tokens)[1];
             dynamic stepsRange = tf.range(nSteps, dtype: tf.int32);
             Tensor result = ExpandTile(stepsRange + pastLength, batchSize);
-            if (!result.dtype.is_integer)
+            if(!result.dtype.is_compatible_with(tf.int32))
                 throw new InvalidOperationException();
             return result;
         }
 
-        public static Dictionary<string, Tensor> Model(IHParams hParams, Tensor input, dynamic? past = null, string scope = "model", _ReuseMode? reuse = null) {
+        public static Dictionary<string, Tensor> Model(GptHParams hParams, Tensor input, dynamic? past = null, string scope = "model", _ReuseMode? reuse = null) {
             var result = new Dictionary<string, Tensor>();
             using var _ = new variable_scope(scope, reuse: reuse).StartUsing();
             var batchSeq = ShapeList(input);
             int batch = batchSeq[0];
             dynamic sequence = batchSeq[1];
 
-            var wpe = tf.get_variable("wpe", new TensorShape(hParams.n_ctx(), hParams.n_embd()), initializer: new random_normal_initializer(stddev: 0.01));
-            var wte = tf.get_variable("wte", new TensorShape(hParams.n_vocab(), hParams.n_embd()), initializer: new random_normal_initializer(stddev: 0.02));
+            var wpe = v1.get_variable("wpe", new TensorShape(hParams.ContextTokens, hParams.EmbeddingDim), initializer: new random_normal_initializer(stddev: 0.01));
+            var wte = v1.get_variable("wte", new TensorShape(hParams.VocabularySize, hParams.EmbeddingDim), initializer: new random_normal_initializer(stddev: 0.02));
 
             Tensor pastLen = past is null ? tf.constant(0) : tf.shape(past)[^2];
             var h = tf.gather_dyn(wte, input) + tf.gather_dyn(wpe, PositionsFor(input, pastLen));
@@ -236,7 +237,7 @@
             var presents = new List<object>();
             var pasts = !(past is null)
                 ? tf.unstack(past, axis: 1)
-                : Enumerable.Repeat<object?>(null, hParams.n_layer());
+                : Enumerable.Repeat<object?>(null, hParams.EncoderLayers);
 
             int layer = 0;
             foreach (dynamic existingPast in pasts) {
@@ -250,22 +251,20 @@
             h = Norm(h, "ln_f");
 
             // Language model loss.  Do tokens <n predict token n?
-            var hFlat = tf.reshape_dyn(h, new[] { sequence * batch, hParams.n_embd() });
+            var hFlat = tf.reshape_dyn(h, new[] { sequence * batch, hParams.EmbeddingDim });
             Tensor logits = tf.matmul(hFlat, wte, transpose_b: true);
-            logits = tf.reshape_dyn(logits, new[] { batch, sequence, hParams.n_vocab() });
+            logits = tf.reshape_dyn(logits, new[] { batch, sequence, hParams.VocabularySize });
             result["logits"] = logits;
             return result;
         }
 
-        public static HParams LoadHParams(string modelName) {
-            var hParams = DefaultHParams;
-            string paramsOverridePath = Path.Combine("models", modelName, "hparams.json");
-            var overrides = JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(paramsOverridePath));
-            var pyDict = new PythonDict<object, object>();
+        public static GptHParams LoadHParams(string modelName) {
+            var hParams = new Dictionary<string, int>(DefaultHParams);
+            string paramsOverridePath = Path.Combine(modelName, "hparams.json");
+            var overrides = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(paramsOverridePath));
             foreach (var entry in overrides)
-                pyDict.Add(entry.Key, entry.Value);
-            hParams.override_from_dict(pyDict);
-            return hParams;
+                hParams[entry.Key] = entry.Value;
+            return new GptHParams(hParams);
         }
     }
 }

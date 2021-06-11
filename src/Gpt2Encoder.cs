@@ -168,9 +168,9 @@ namespace LostTech.TensorFlow.GPT {
             => JsonSerializer.Deserialize<Dictionary<string, int>>(json)
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString(CultureInfo.InvariantCulture));
 
-        public static Gpt2Encoder LoadEncoder(string modelName) {
-            var encoder = LoadEncoderJson(File.ReadAllText(Path.Combine("models", modelName, "encoder.json"), Encoding.UTF8));
-            var bpeMerges = BytePairEncoding.FromFile(Path.Combine("models", modelName, "vocab.bpe"));
+        public static Gpt2Encoder LoadEncoder(string modelPath) {
+            var encoder = LoadEncoderJson(File.ReadAllText(Path.Combine(modelPath, "encoder.json"), Encoding.UTF8));
+            var bpeMerges = BytePairEncoding.FromFile(Path.Combine(modelPath, "vocab.bpe"));
             return new Gpt2Encoder(encoder, bpeMerges);
         }
     }

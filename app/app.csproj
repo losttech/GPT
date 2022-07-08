@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>gpt-2</AssemblyName>
     <RootNamespace>LostTech.TensorFlow.GPT</RootNamespace>
     <LangVersion>9.0</LangVersion>

@@ -214,7 +214,7 @@
         static Tensor PositionsFor(dynamic tokens, Tensor pastLength) {
             Tensor batchSize = tf.shape(tokens)[0];
             Tensor nSteps = tf.shape(tokens)[1];
-            dynamic stepsRange = tf.range(nSteps, dtype: tf.int32);
+            dynamic stepsRange = tf.range(nSteps, limit: null, delta: null, dtype: tf.int32);
             Tensor result = ExpandTile(stepsRange + pastLength, batchSize);
             if(!result.dtype.is_compatible_with(tf.int32))
                 throw new InvalidOperationException();

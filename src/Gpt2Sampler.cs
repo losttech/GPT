@@ -93,7 +93,7 @@
             Tensor maxTokens = tf.constant(length);
             // for some reason on CPU you can't sample longer texts
             // https://github.com/losttech/Gradient-Samples/issues/1
-            if (!tf.test.is_gpu_available())
+            if (tf.config.list_physical_devices().Count == 0)
                 maxTokens -= tf.shape(context)[1];
 
             Tensor result = tf.while_loop_dyn(

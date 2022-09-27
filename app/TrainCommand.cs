@@ -17,14 +17,13 @@
             if (remainingArguments.Length < 1)
                 throw new ArgumentNullException("dataset");
 
-            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(this.ModelName);
-
             string checkpoint = Gpt2Checkpoints.ProcessCheckpointConfig(
-                modelPath: modelPath,
+                modelRoot: this.ModelPath,
                 checkpoint: this.Checkpoint,
                 runName: this.RunName);
 
-            var encoder = Gpt2Encoder.LoadEncoder(modelPath);
+            var encoder = Gpt2Encoder.Load(this.ModelPath);
+            var hParams = Gpt2Model.LoadHParams(Path.Combine(this.ModelPath, "hparams.json"));
 
             string searchPattern = this.Include ?? "*";
             string datasetName = remainingArguments[0];
@@ -35,8 +34,6 @@
                 Console.Error.WriteLine("The dataset is empty!");
                 return -1;
             }
-
-            var hParams = Gpt2Model.LoadHParams(modelPath);
 
             var random = this.Seed is null ? new Random() : new Random(this.Seed.Value);
             tf.random.set_seed(this.Seed);
@@ -51,7 +48,7 @@
                 SampleNum = this.SampleNum,
                 SampleEvery = this.SampleEvery,
             };
-            string checkpointOutputDirectory = Path.Combine(modelPath, Gpt2Checkpoints.CheckpointDir);
+            string checkpointOutputDirectory = Path.Combine(this.ModelPath, Gpt2Checkpoints.CheckpointDir);
             trainer.FineTune(
                 checkpointsDir: checkpointOutputDirectory, checkpoint: checkpoint,
                 run: this.RunName,
@@ -82,7 +79,7 @@
             return Gpt2Dataset.FromTexts(encoder, texts);
         }
 
-        public string ModelName { get; set; } = "117M";
+        public string ModelPath { get; set; } = Path.Combine("models", "117M");
         public int? Seed { get; set; }
         public int BatchSize { get; set; } = 1;
         public int SampleLength { get; set; } = 1024;
@@ -98,7 +95,8 @@
         public TrainCommand() {
             this.IsCommand("train");
             this.HasAdditionalArguments(1, "<dataset>");
-            this.HasOption("m|model=", "Which model to use", name => this.ModelName = name);
+            this.HasOption("m|model=", "Which model to use", name => this.ModelPath = Path.Combine("models", name));
+            this.HasOption("p|model-path=", "Full path to model directory", name => this.ModelPath = name);
             this.HasOption("s|seed=",
                 "Explicitly set seed for random generators to get reproducible results",
                 (int s) => this.Seed = s);

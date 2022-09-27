@@ -18,12 +18,12 @@ namespace LostTech.TensorFlow.GPT {
         public GptTrainingSampler(DataSet chunks, Random random) {
             this.random = random ?? throw new ArgumentNullException(nameof(random));
             this.chunks = chunks ?? throw new ArgumentNullException(nameof(chunks));
-            this.TokenCount = chunks.Sum(chunk => chunk.shape.Item1);
+            this.TokenCount = chunks.Sum(chunk => chunk.shape[0]);
             if (this.TokenCount == 0)
                 throw new ArgumentException("Dataset is empty", paramName: nameof(chunks));
 
             foreach (var chunk in chunks)
-                this.boundaries.Add(this.boundaries[^1] + chunk.shape.Item1);
+                this.boundaries.Add(this.boundaries[^1] + (int)chunk.shape[0]);
         }
 
         public ndarray Sample(int length) {

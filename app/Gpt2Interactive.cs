@@ -1,6 +1,7 @@
 ﻿namespace LostTech.TensorFlow.GPT {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Threading;
 
@@ -19,7 +20,7 @@
         /// <summary>
         /// Interactively run the model
         /// </summary>
-        /// <param name="modelName">Which model to use</param>
+        /// <param name="modelRoot">Which model to use</param>
         /// <param name="checkpoint">Which checkpoint to load</param>
         /// <param name="seed">Seed for random number generators, fix seed to reproduce results</param>
         /// <param name="sampleCount">Number of samples to return total</param>
@@ -35,16 +36,14 @@
         ///     while 40 means 40 words are considered at each step. 0 (default) is a
         ///     special setting meaning no restrictions. 40 generally is a good value.
         /// </param>
-        public static int Run(string modelName = "117M", string? checkpoint = null, int? seed = null,
+        public static int Run(string modelRoot = "117M", string? checkpoint = null, int? seed = null,
             int sampleCount = 1,
             int batchSize = 1, int? length = null, float temperature = 1, int topK = 0) {
             if (sampleCount % batchSize != 0)
                 throw new ArgumentException();
 
-            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(modelName);
-
-            var encoder = Gpt2Encoder.LoadEncoder(modelPath);
-            var hParams = Gpt2Model.LoadHParams(modelPath);
+            var encoder = Gpt2Encoder.Load(modelRoot);
+            var hParams = Gpt2Model.LoadHParams(modelRoot);
 
             int nCtx = hParams.ContextTokens;
             if (length is null)
@@ -70,7 +69,7 @@
                 topK: topK);
 
             var saver = new Saver();
-            checkpoint ??= tf.train.latest_checkpoint(modelPath);
+            checkpoint ??= tf.train.latest_checkpoint(modelRoot);
             saver.restore(sess, checkpoint);
 
             bool interrupted = false;
@@ -128,7 +127,7 @@
 
         public Gpt2Interactive() {
             this.IsCommand("run");
-            this.HasOption("m|model=", "Which model to use (directory path)", name => this.ModelName = name);
+            this.HasOption("m|model-path=", "Which model to use (directory path)", path => this.ModelPath = path);
             this.HasOption("s|seed=",
                 "Explicitly set seed for random generators to get reproducible results",
                 (int s) => this.Seed = s);
@@ -148,7 +147,7 @@
                 checkpoint => this.Checkpoint = checkpoint);
         }
 
-        public string ModelName { get; set; } = "117M";
+        public string ModelPath { get; set; } = Path.Combine("models", "117M");
         public int? Seed { get; set; }
         public int SampleCount { get; set; } = 1;
         public int BatchSize { get; set; } = 1;
@@ -159,14 +158,13 @@
         public string Checkpoint { get; set; } = "latest";
 
         public override int Run(string[] remainingArguments) {
-            string modelPath = CommonCommandOptions.ExpandModelNameToPathOrExit(this.ModelName);
             string checkpoint = Gpt2Checkpoints.ProcessCheckpointConfig(
-                modelPath: modelPath,
+                modelRoot: this.ModelPath,
                 checkpoint: this.Checkpoint,
                 runName: this.RunName);
 
             return Run(
-                modelName: this.ModelName,
+                modelRoot: this.ModelPath,
                 checkpoint: checkpoint,
                 seed: this.Seed,
                 sampleCount: this.SampleCount,

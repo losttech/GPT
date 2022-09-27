@@ -67,7 +67,7 @@
         /// </summary>
         static Tensor SplitStates(Tensor input, int n) {
             var shape = ShapeList(input);
-            dynamic reminder = shape.Last() / n;
+            int reminder = (int)shape.Last() / n;
             shape[shape.Count - 1] = n;
             shape.Add(reminder);
             return tf.reshape_dyn(input, shape);
@@ -258,9 +258,9 @@
             return result;
         }
 
-        public static GptHParams LoadHParams(string modelName) {
+        public static GptHParams LoadHParams(string path) {
             var hParams = new Dictionary<string, int>(DefaultHParams);
-            string paramsOverridePath = Path.Combine(modelName, "hparams.json");
+            string paramsOverridePath = path;
             var overrides = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(paramsOverridePath));
             foreach (var entry in overrides)
                 hParams[entry.Key] = entry.Value;

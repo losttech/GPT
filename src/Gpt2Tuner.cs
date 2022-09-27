@@ -64,7 +64,7 @@ namespace LostTech.TensorFlow.GPT {
             };
             var tuple = this.session.run((this.optimizerStep, this.Loss), feed_dict: placeholderValues);
 
-            return tuple.Item2;
+            return tuple[1];
         }
     }
 }

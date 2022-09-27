@@ -7,6 +7,7 @@ namespace LostTech.TensorFlow.GPT {
     using LostTech.Gradient;
 
     using tensorflow;
+    using tensorflow.compat.v1;
 
     using Xunit;
 
@@ -26,7 +27,7 @@ namespace LostTech.TensorFlow.GPT {
             using var _ = session.StartUsing();
 
             int batchSize = 4;
-            var input = tf.placeholder(tf.int32, new TensorShape(batchSize, null));
+            var input = v1.placeholder(tf.int32, new TensorShape(batchSize, null));
             var outputs = Gpt2Model.Model(hyperparams, input);
             var tuner = new Gpt2Tuner(hyperparams, session,
                                       inputPlaceholder: input,
@@ -34,7 +35,7 @@ namespace LostTech.TensorFlow.GPT {
                                       new GptTrainingSampler(dataset, new Random()),
                                       batchSize: batchSize);
 
-            session.run(tf.global_variables_initializer());
+            session.run(v1.global_variables_initializer());
 
             float loss0 = tuner.FineTuneOnBatch();
             float loss1 = tuner.FineTuneOnBatch();
@@ -45,7 +46,5 @@ namespace LostTech.TensorFlow.GPT {
         static readonly string EncoderJson = EmbededResources.ReadResource("encoder.json");
         static (string, string)[] TestBPE => BytePairEncoding.FromReader(new StringReader(EmbededResources.ReadResource("vocab.bpe"))).ToArray();
         static Dictionary<string, string> TestEncoder => Gpt2Encoder.LoadEncoderJson(EncoderJson);
-
-
     }
 }

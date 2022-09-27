@@ -146,9 +146,11 @@ namespace LostTech.TensorFlow.GPT {
         public List<string> Encode(string text) {
             var bpeTokens = new List<string>();
             using var _ = Py.GIL();
-            foreach (string token in regex.findall(pattern, text)) {
-                string encoded = new(Encoding.UTF8.GetBytes(token)
+            using PyIterable tokens = regex.findall(pattern, text);
+            foreach (PyObject token in tokens) {
+                string encoded = new(Encoding.UTF8.GetBytes(token.ToString())
                     .Select(@byte => this.byteEncoder[@byte]).ToArray());
+                token.Dispose();
                 string bpe = this.BPE(encoded);
                 foreach (string bpeToken in bpe.Split(' '))
                     bpeTokens.Add(this.encoder[bpeToken]);
@@ -168,9 +170,9 @@ namespace LostTech.TensorFlow.GPT {
             => JsonSerializer.Deserialize<Dictionary<string, int>>(json)
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString(CultureInfo.InvariantCulture));
 
-        public static Gpt2Encoder LoadEncoder(string modelPath) {
-            var encoder = LoadEncoderJson(File.ReadAllText(Path.Combine(modelPath, "encoder.json"), Encoding.UTF8));
-            var bpeMerges = BytePairEncoding.FromFile(Path.Combine(modelPath, "vocab.bpe"));
+        public static Gpt2Encoder Load(string directory) {
+            var encoder = LoadEncoderJson(File.ReadAllText(Path.Combine(directory, "encoder.json"), Encoding.UTF8));
+            var bpeMerges = BytePairEncoding.FromFile(Path.Combine(directory, "vocab.bpe"));
             return new Gpt2Encoder(encoder, bpeMerges);
         }
     }
